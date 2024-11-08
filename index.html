@@ -135,6 +135,35 @@
     });
 }
 
+      function mostrarDocumentosDesdeIndexedDB() {
+    abrirIndexedDB().then(db => {
+        const transaction = db.transaction(["documentos"], "readonly");
+        const objectStore = transaction.objectStore("documentos");
+
+        const fileList = document.getElementById("listscripts");
+        fileList.innerHTML = ""; // Limpiar lista antes de cargar
+
+        objectStore.openCursor().onsuccess = function(event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                const listItem = document.createElement("div");
+                listItem.textContent = cursor.value.name;
+                listItem.onclick = () => abrirDocumentoEnTeleprompter(cursor.value.content);
+                fileList.appendChild(listItem);
+
+                cursor.continue();
+            }
+        };
+    });
+}
+
+// Función para mostrar el contenido del documento en el teleprompter
+function abrirDocumentoEnTeleprompter(htmlContent) {
+    const teleprompter = document.getElementById('teleprompter');
+    teleprompter.innerHTML = htmlContent;
+    iniciarTeleprompter(); // Llama a la función para iniciar el teleprompter
+}
+
       
       async function listFiles() {
     let response;

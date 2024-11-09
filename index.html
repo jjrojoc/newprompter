@@ -85,39 +85,68 @@
       /**
        *  Sign in the user upon button click.
        */
-      function handleAuthClick() {
-        tokenClient.callback = async (resp) => {
-          if (resp.error !== undefined) {
-            throw (resp);
-          }
-          document.getElementById('signout_button').style.visibility = 'visible';
-          document.getElementById('authorize_button').innerText = 'Refresh';
-          await listFiles();
-        };
-
-        if (gapi.client.getToken() === null) {
-          // Prompt the user to select a Google Account and ask for consent to share their data
-          // when establishing a new session.
-          tokenClient.requestAccessToken({prompt: 'consent'});
-        } else {
-          // Skip display of account chooser and consent dialog for an existing session.
-          tokenClient.requestAccessToken({prompt: ''});
+       function handleAuthClick() {
+    tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) {
+            throw resp;
         }
-      }
+        // Guardar el token de acceso y el tiempo de expiración en localStorage
+        const expiresAt = Date.now() + resp.expires_in * 1000;
+        localStorage.setItem('access_token', resp.access_token);
+        localStorage.setItem('token_expires_at', expiresAt);
+
+        document.getElementById('signout_button').style.visibility = 'visible';
+        document.getElementById('authorize_button').innerText = 'Refresh';
+        await listFiles();
+    };
+
+    const storedToken = localStorage.getItem('access_token');
+    const tokenExpiresAt = localStorage.getItem('token_expires_at');
+
+    if (storedToken && tokenExpiresAt && Date.now() < tokenExpiresAt) {
+        // Usa el token almacenado si todavía es válido
+        gapi.client.setToken({ access_token: storedToken });
+        document.getElementById('signout_button').style.visibility = 'visible';
+        document.getElementById('authorize_button').innerText = 'Refresh';
+        listFiles();
+    } else {
+        // Solicita un nuevo token si no hay uno válido almacenado
+        tokenClient.requestAccessToken({ prompt: '' });
+    }
+}
+
 
       /**
        *  Sign out the user upon button click.
        */
-      function handleSignoutClick() {
-        const token = gapi.client.getToken();
-        if (token !== null) {
-          google.accounts.oauth2.revoke(token.access_token);
-          gapi.client.setToken('');
-          document.getElementById('content').innerText = '';
-          document.getElementById('authorize_button').innerText = 'Authorize';
-          document.getElementById('signout_button').style.visibility = 'hidden';
+       function handleSignoutClick() {
+    const token = gapi.client.getToken();
+    if (token !== null) {
+        google.accounts.oauth2.revoke(token.access_token);
+        gapi.client.setToken('');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('token_expires_at');
+        
+        document.getElementById('content').innerText = '';
+        document.getElementById('authorize_button').innerText = 'Authorize';
+        document.getElementById('signout_button').style.visibility = 'hidden';
+    }
+}
+
+
+        function renovarTokenSiEsNecesario() {
+            const tokenExpiresAt = localStorage.getItem('token_expires_at');
+
+            // Verifica si el token ha expirado
+            if (tokenExpiresAt && Date.now() >= tokenExpiresAt) {
+                // Solicita un nuevo token sin que el usuario tenga que volver a autenticar
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
         }
-      }
+
+        // Ejecuta la renovación cada 10 minutos para mantener el token actualizado
+        setInterval(renovarTokenSiEsNecesario, 10 * 60 * 1000);
+
 
       /**
        * Print metadata for first 10 files.
